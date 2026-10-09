@@ -1,20 +1,18 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Approximate Cessna 150B</title>
-  <style>
-    body { margin: 0; overflow: hidden; background: #b9d4e8; }
-    #label {
-      position: fixed; top: 12px; left: 14px; color: #172532;
-      font: 14px system-ui, sans-serif; background: #ffffffbb;
-      padding: 8px 11px; border-radius: 6px;
-    }
-  </style>
-</head>
-<body>
-<div id="label">Approximate Cessna 150B exterior · drag to orbit · scroll to zoom</div>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cessna 150B — exterior model</title>
+<style>
+  body { margin:0; overflow:hidden; background:#9eb5c5; }
+  #label {
+    position:fixed; left:12px; top:12px; z-index:1;
+    font:14px system-ui,sans-serif; color:#17232b;
+    background:#ffffffdd; padding:8px 11px; border-radius:6px;
+  }
+</style>
+
 <script type="importmap">
 {
   "imports": {
@@ -22,17 +20,21 @@
   }
 }
 </script>
+</head>
+<body>
+<div id="label">Cessna 150B · drag to orbit · scroll to zoom</div>
+
 <script type="module">
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js";
 import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/controls/OrbitControls.js";
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0xb9d4e8);
+scene.background = new THREE.Color(0x9eb5c5);
 
-const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 100);
-camera.position.set(8, 6, 11);
+const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(8, 5.3, 10);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
@@ -41,170 +43,213 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.body.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, 1.2, 0);
+controls.target.set(0, 1.25, 0);
 controls.enableDamping = true;
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x647080, 2.0));
-const sun = new THREE.DirectionalLight(0xffffff, 3.0);
-sun.position.set(5, 10, 6);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x53616c, 2));
+const sun = new THREE.DirectionalLight(0xffffff, 3);
+sun.position.set(5, 10, 7);
 sun.castShadow = true;
 scene.add(sun);
 
-const white = new THREE.MeshStandardMaterial({ color: 0xe9e7da, roughness: 0.55 });
-const red = new THREE.MeshStandardMaterial({ color: 0xb52820, roughness: 0.5 });
+const paint = new THREE.MeshStandardMaterial({color:0xe6e2d3, roughness:.55});
+const red = new THREE.MeshStandardMaterial({color:0xa9221c, roughness:.48});
 const glass = new THREE.MeshStandardMaterial({
-  color: 0x183b4c, metalness: 0.25, roughness: 0.2
+  color:0x182f38, metalness:.15, roughness:.22, side:THREE.DoubleSide
 });
-const metal = new THREE.MeshStandardMaterial({ color: 0x858b8c, metalness: 0.7 });
-const tire = new THREE.MeshStandardMaterial({ color: 0x202124, roughness: 0.85 });
-const propMat = new THREE.MeshStandardMaterial({ color: 0x25282a, metalness: 0.5 });
+const steel = new THREE.MeshStandardMaterial({color:0x737b7d, metalness:.65});
+const rubber = new THREE.MeshStandardMaterial({color:0x202124, roughness:.9});
+const propMat = new THREE.MeshStandardMaterial({color:0x242627, metalness:.4});
 
-function ellipsoid(name, pos, scale, mat, segments=32) {
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, segments, 20), mat);
-  mesh.name = name;
-  mesh.position.set(...pos);
-  mesh.scale.set(...scale);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  scene.add(mesh);
-  return mesh;
+function mesh(name, geometry, mat, pos=[0,0,0]) {
+  const o = new THREE.Mesh(geometry, mat);
+  o.name = name;
+  o.position.set(...pos);
+  o.castShadow = true;
+  o.receiveShadow = true;
+  scene.add(o);
+  return o;
 }
 
-function rod(name, a, b, radius, mat) {
+function ellipsoid(name, pos, scale, mat) {
+  const o = mesh(name, new THREE.SphereGeometry(1,32,20), mat, pos);
+  o.scale.set(...scale);
+  return o;
+}
+
+function beam(name, a, b, radius, mat) {
   const start = new THREE.Vector3(...a), end = new THREE.Vector3(...b);
-  const dir = new THREE.Vector3().subVectors(end, start);
-  const mesh = new THREE.Mesh(
-    new THREE.CylinderGeometry(radius, radius, dir.length(), 12), mat
-  );
-  mesh.name = name;
-  mesh.position.copy(start).add(end).multiplyScalar(0.5);
-  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
-  mesh.castShadow = true;
-  scene.add(mesh);
-  return mesh;
+  const d = new THREE.Vector3().subVectors(end,start);
+  const o = mesh(name, new THREE.CylinderGeometry(radius,radius,d.length(),12));
+  o.position.copy(start).add(end).multiplyScalar(.5);
+  o.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d.normalize());
+  return o;
 }
 
-// Fuselage runs nose (+X) to tail (-X).
-ellipsoid("Fuselage", [0, 1.35, 0], [2.45, 0.38, 0.36], white);
-ellipsoid("Nose cowl", [1.85, 1.38, 0], [0.62, 0.34, 0.34], white);
-ellipsoid("Tail taper", [-2.25, 1.36, 0], [0.95, 0.19, 0.20], white);
-
-// Red side stripe, both sides.
-for (const s of [-1, 1]) {
-  ellipsoid("Fuselage stripe", [-0.15, 1.43, s*0.347], [1.55, 0.045, 0.025], red);
-}
-
-// Main wing: tapered planform with a slight dihedral.
-function makeWing() {
-  const span = 5.05, sections = 20, verts = [], indices = [];
-  for (let i=0; i<=sections; i++) {
-    const t = i/sections, z = -span + 2*span*t;
-    const f = Math.abs(z)/span;
-    const chord = 1.62*(1-f) + 0.92*f;
-    const sweep = 0.16*f;
-    const xLead = -0.70 - sweep;
-    const y = 2.05 + 0.12*f;
-    const thick = 0.105*(1-0.45*f);
-    // Leading/trailing top and bottom vertices.
-    verts.push(
-      xLead, y+thick, z, xLead+chord, y+thick, z,
-      xLead, y-thick, z, xLead+chord, y-thick, z
-    );
-  }
-  for (let i=0; i<sections; i++) {
-    const a=i*4, b=(i+1)*4;
-    for (const [u,v] of [[0,1],[2,3],[0,2],[1,3]]) {
-      indices.push(a+u,a+v,b+v, a+u,b+v,b+u);
+// Fuselage loft. Nose is +X; tail is -X; wingspan runs along Z.
+function fuselage() {
+  const stations = [
+    [ 3.15,.16,.18,1.31], [ 2.75,.29,.30,1.32],
+    [ 2.10,.40,.38,1.34], [ 1.15,.46,.43,1.36],
+    [  .25,.47,.43,1.36], [ -.75,.41,.37,1.34],
+    [-1.65,.29,.29,1.32], [-2.55,.17,.18,1.30],
+    [-3.28,.07,.09,1.29]
+  ];
+  const verts=[], faces=[], sides=24;
+  for (const [x,rz,ry,cy] of stations) {
+    for(let j=0;j<sides;j++) {
+      const a=2*Math.PI*j/sides;
+      verts.push(x, cy+ry*Math.sin(a), rz*Math.cos(a));
     }
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
-  g.setIndex(indices);
-  g.computeVertexNormals();
-  const wing = new THREE.Mesh(g, white);
-  wing.name = "Main high wing";
-  wing.material.side = THREE.DoubleSide;
-  wing.castShadow = true;
-  wing.receiveShadow = true;
-  scene.add(wing);
+  for(let i=0;i<stations.length-1;i++) {
+    for(let j=0;j<sides;j++) {
+      const a=i*sides+j, b=i*sides+(j+1)%sides;
+      const c=(i+1)*sides+(j+1)%sides, d=(i+1)*sides+j;
+      faces.push(a,b,c,a,c,d);
+    }
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));
+  g.setIndex(faces); g.computeVertexNormals();
+  mesh("Tapered fuselage",g,paint);
 }
-makeWing();
+fuselage();
 
-// Red wingtip caps.
-for (const s of [-1, 1])
-  ellipsoid("Wingtip", [-0.72, 2.13, s*4.91], [0.42, 0.075, 0.18], red);
+// Engine cowling and spinner.
+ellipsoid("Engine cowling",[2.58,1.35,0],[.56,.34,.34],paint);
+ellipsoid("Propeller spinner",[3.18,1.35,0],[.20,.16,.16],red);
 
-// Horizontal tailplane and elevator.
-ellipsoid("Horizontal stabilizer", [-2.55, 1.52, 0], [0.58, 0.075, 1.48], white);
-ellipsoid("Elevator", [-2.92, 1.52, 0], [0.24, 0.065, 1.43], red);
-
-// Vertical fin and rudder.
-ellipsoid("Vertical fin", [-2.55, 1.78, 0], [0.56, 0.48, 0.075], white);
-ellipsoid("Rudder", [-2.84, 1.82, 0], [0.30, 0.39, 0.085], red);
-
-// Cockpit glazing on both sides.
-for (const s of [-1, 1]) {
-  ellipsoid("Front side window", [0.55, 1.68, s*0.345], [0.43, 0.20, 0.045], glass);
-  ellipsoid("Rear side window", [-0.38, 1.67, s*0.33], [0.40, 0.19, 0.045], glass);
+// Main wing: tapered planform, modest dihedral, thin airfoil.
+function wing(name, halfSpan, rootChord, tipChord, xCenter, yBase, material) {
+  const count=24, verts=[], faces=[];
+  for(let i=0;i<=count;i++) {
+    const t=i/count, z=-halfSpan+2*halfSpan*t, f=Math.abs(z)/halfSpan;
+    const chord=rootChord*(1-f)+tipChord*f;
+    const xLead=xCenter-chord/2-0.12*f;
+    const y=yBase+0.16*f, thick=.075*(1-.35*f);
+    verts.push(
+      xLead,y+thick,z, xLead+chord,y+thick,z,
+      xLead,y-thick,z, xLead+chord,y-thick,z
+    );
+  }
+  for(let i=0;i<count;i++) {
+    const a=i*4,b=(i+1)*4;
+    for(const [u,v] of [[0,1],[2,3],[0,2],[1,3]]) {
+      faces.push(a+u,a+v,b+v,a+u,b+v,b+u);
+    }
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute("position",new THREE.Float32BufferAttribute(verts,3));
+  g.setIndex(faces); g.computeVertexNormals();
+  const m=mesh(name,g,material);
+  m.material.side=THREE.DoubleSide;
 }
-// Windscreen
-ellipsoid("Windscreen", [1.00, 1.70, 0], [0.20, 0.24, 0.27], glass);
+wing("High wing",5.08,1.65,.90,-.15,2.18,paint);
 
-// Main landing gear, wheels and hubs.
-for (const s of [-1, 1]) {
-  rod("Main gear leg", [0.20, 1.12, s*0.22], [0.43, 0.36, s*0.79], 0.045, metal);
-  const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.09, 12, 28), tire);
-  wheel.name = "Main tire";
-  wheel.position.set(0.43, 0.31, s*0.84);
-  wheel.rotation.y = Math.PI/2;
-  wheel.castShadow = true;
-  scene.add(wheel);
-  ellipsoid("Wheel hub", [0.43, 0.31, s*0.91], [0.10, 0.10, 0.035], metal);
+// Red tips and simple red wing stripe.
+for(const s of [-1,1]) {
+  ellipsoid("Red wingtip",[-.25,2.28,s*4.98],[.48,.045,.12],red);
+}
+const wingStripe = new THREE.MeshStandardMaterial({color:0xa9221c, side:THREE.DoubleSide});
+function stripePanel(side) {
+  const shape=new THREE.Shape();
+  shape.moveTo(-.92,2.257); shape.lineTo(.52,2.257);
+  shape.lineTo(.52,2.273); shape.lineTo(-.92,2.273); shape.closePath();
+  const g=new THREE.ShapeGeometry(shape);
+  const o=mesh("Wing accent stripe",g,wingStripe,[0,0,side*.48]);
+  o.rotation.x=Math.PI/2;
+}
+stripePanel(-1); stripePanel(1);
+
+// Straight horizontal tail surfaces and straight vertical tail.
+wing("Horizontal tailplane",1.48,.92,.62,-2.62,1.53,paint);
+ellipsoid("Straight vertical fin",[-2.70,1.78,0],[.43,.43,.075],paint);
+ellipsoid("Rudder",[-2.91,1.79,0],[.20,.34,.084],red);
+
+// Cabin roof: compact, squared-off two-seat cabin under the wing.
+ellipsoid("Cabin roof",[-.02,1.76,0],[.91,.37,.40],paint);
+
+// Side windows as flat framed polygon panels.
+function sideWindow(name, points, side) {
+  const shape=new THREE.Shape();
+  shape.moveTo(points[0][0],points[0][1]);
+  for(let i=1;i<points.length;i++) shape.lineTo(points[i][0],points[i][1]);
+  shape.closePath();
+  const o=mesh(name,new THREE.ShapeGeometry(shape),glass,[0,0,side*.405]);
+  o.material.side=THREE.DoubleSide;
+}
+for(const s of [-1,1]) {
+  // Main door window and rear cabin window. Early fastback: no rear fuselage window.
+  sideWindow("Front cabin window",[
+    [.12,1.66],[.82,1.66],[.69,2.00],[.24,2.03]
+  ],s);
+  sideWindow("Rear cabin window",[
+    [-.62,1.65],[-.04,1.65],[.02,2.02],[-.48,2.03]
+  ],s);
 }
 
-// Nose gear and tire.
-rod("Nose gear leg", [1.35, 1.08, 0], [1.55, 0.32, 0], 0.045, metal);
-const nw = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.065, 12, 24), tire);
-nw.name = "Nose tire";
-nw.position.set(1.57, 0.23, 0);
-nw.rotation.y = Math.PI/2;
-nw.castShadow = true;
-scene.add(nw);
-
-// Two-blade propeller at the nose.
-ellipsoid("Propeller hub", [2.48, 1.38, 0], [0.13, 0.13, 0.13], metal);
-for (const angle of [0, Math.PI]) {
-  const blade = ellipsoid("Propeller blade", [2.55, 1.38, 0], [0.07, 0.66, 0.095], propMat);
-  blade.rotation.x = angle;
+// Slanted front windshield, a broad dark pane.
+{
+  const shape=new THREE.Shape();
+  shape.moveTo(1.03,1.67); shape.lineTo(1.30,1.67);
+  shape.lineTo(1.00,1.99); shape.lineTo(.76,1.99); shape.closePath();
+  const g=new THREE.ShapeGeometry(shape);
+  const w=mesh("Windshield",g,glass,[0,0,0]);
+  w.rotation.y=Math.PI/2;
 }
 
-// Simple door handles and exhausts.
-for (const s of [-1, 1]) {
-  ellipsoid("Door handle", [-0.55, 1.28, s*0.36], [0.07, 0.025, 0.025], metal);
-  rod("Exhaust", [1.42, 1.14, s*0.25], [1.80, 1.14, s*0.25], 0.035, metal);
+// Red/white side stripe on fuselage.
+for(const s of [-1,1]) {
+  const stripe=ellipsoid("Fuselage red stripe",[-.65,1.42,s*.386],[1.65,.055,.018],red);
 }
 
-// Ground
-const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(200, 200),
-  new THREE.MeshStandardMaterial({ color: 0x68766d, roughness: 1 })
-);
-ground.rotation.x = -Math.PI/2;
-ground.position.y = -0.02;
-ground.receiveShadow = true;
-scene.add(ground);
+// Wing lift struts: paired diagonal braces on each side.
+for(const s of [-1,1]) {
+  beam("Wing strut",[-.68,1.22,s*.42],[-.24,2.13,s*3.85],.035,steel);
+  beam("Cabane support",[-.35,1.62,s*.33],[-.44,2.12,s*.82],.027,steel);
+  beam("Cabane support",[.38,1.63,s*.31],[.16,2.12,s*.82],.027,steel);
+}
+
+// Main landing gear legs and tires.
+for(const s of [-1,1]) {
+  beam("Main landing gear",[-.62,1.12,s*.22],[-.10,.36,s*.82],.055,steel);
+  beam("Gear fairing",[-.48,.94,s*.40],[-.20,.49,s*.74],.095,paint);
+
+  const wheel=mesh("Main tire",new THREE.TorusGeometry(.25,.095,14,28),rubber,[.00,.29,s*.84]);
+  wheel.rotation.y=Math.PI/2;
+  ellipsoid("Wheel hub",[.00,.29,s*.93],[.11,.11,.035],steel);
+}
+
+// Nose wheel.
+beam("Nose gear", [1.85,1.06,0], [2.10,.35,0], .045, steel);
+const noseWheel=mesh("Nose tire",new THREE.TorusGeometry(.17,.065,12,24),rubber,[2.12,.23,0]);
+noseWheel.rotation.y=Math.PI/2;
+ellipsoid("Nose hub",[2.21,.23,0],[.075,.075,.03],steel);
+
+// Two-blade propeller, in front of the cowling.
+for(const a of [0,Math.PI]) {
+  const blade=ellipsoid("Propeller blade",[3.27,1.35,0],[.055,.64,.085],propMat);
+  blade.rotation.x=a;
+}
+
+// Ground.
+const ground=mesh("Ground",new THREE.PlaneGeometry(200,200),
+  new THREE.MeshStandardMaterial({color:0x78847c,roughness:1}),[0,-.03,0]);
+ground.rotation.x=-Math.PI/2;
+ground.receiveShadow=true;
 
 function animate() {
   requestAnimationFrame(animate);
   controls.update();
-  renderer.render(scene, camera);
+  renderer.render(scene,camera);
 }
 animate();
 
-addEventListener("resize", () => {
-  camera.aspect = innerWidth / innerHeight;
+addEventListener("resize",()=>{
+  camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
+  renderer.setSize(innerWidth,innerHeight);
 });
 </script>
 </body>
