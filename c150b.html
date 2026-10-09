@@ -1,234 +1,205 @@
-import bpy
-import math
-from mathutils import Vector
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Approximate Cessna 150B</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #b9d4e8; }
+    #label {
+      position: fixed; top: 12px; left: 14px; color: #172532;
+      font: 14px system-ui, sans-serif; background: #ffffffbb;
+      padding: 8px 11px; border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+<div id="label">Approximate Cessna 150B exterior · drag to orbit · scroll to zoom</div>
 
-# Clear the scene
-bpy.ops.object.select_all(action="SELECT")
-bpy.ops.object.delete(use_global=False)
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js";
+import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/controls/OrbitControls.js";
 
-# Materials
-def material(name, color, metallic=0.0, roughness=0.4):
-    mat = bpy.data.materials.new(name)
-    mat.diffuse_color = (*color, 1)
-    mat.metallic = metallic
-    mat.roughness = roughness
-    return mat
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xb9d4e8);
 
-white = material("Ivory white paint", (0.88, 0.88, 0.82))
-red = material("Red accent", (0.72, 0.035, 0.025))
-glass = material("Smoky blue glazing", (0.025, 0.12, 0.18), 0.25, 0.18)
-rubber = material("Tire rubber", (0.025, 0.025, 0.025))
-metal = material("Landing gear metal", (0.35, 0.36, 0.34), 0.65)
-prop_mat = material("Propeller dark metal", (0.12, 0.13, 0.13), 0.6)
+const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 100);
+camera.position.set(8, 6, 11);
 
-def smooth(obj):
-    if obj.type == "MESH":
-        for p in obj.data.polygons:
-            p.use_smooth = True
-    return obj
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
 
-def uv_sphere(name, loc, scale, mat, segments=32, rings=16):
-    bpy.ops.mesh.primitive_uv_sphere_add(
-        segments=segments, ring_count=rings, location=loc
-    )
-    obj = bpy.context.object
-    obj.name = name
-    obj.scale = scale
-    obj.data.materials.append(mat)
-    return smooth(obj)
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.2, 0);
+controls.enableDamping = true;
 
-def cylinder_between(name, a, b, radius, mat, vertices=16):
-    a, b = Vector(a), Vector(b)
-    direction = b - a
-    bpy.ops.mesh.primitive_cylinder_add(
-        vertices=vertices,
-        radius=radius,
-        depth=direction.length,
-        location=(a + b) / 2
-    )
-    obj = bpy.context.object
-    obj.name = name
-    obj.rotation_mode = "QUATERNION"
-    obj.rotation_quaternion = direction.to_track_quat("Z", "Y")
-    obj.data.materials.append(mat)
-    return smooth(obj)
+scene.add(new THREE.HemisphereLight(0xffffff, 0x647080, 2.0));
+const sun = new THREE.DirectionalLight(0xffffff, 3.0);
+sun.position.set(5, 10, 6);
+sun.castShadow = true;
+scene.add(sun);
 
-def make_loft(name, stations, mat, sides=16):
-    """
-    stations: list of (x, width, z_center, height)
-    Aircraft points forward along +X; span is Y; vertical is Z.
-    """
-    verts, faces = [], []
-    for x, width, zc, height in stations:
-        for j in range(sides):
-            angle = 2 * math.pi * j / sides
-            verts.append((
-                x,
-                width * math.cos(angle),
-                zc + height * math.sin(angle)
-            ))
-    for i in range(len(stations) - 1):
-        for j in range(sides):
-            a = i * sides + j
-            b = i * sides + (j + 1) % sides
-            c = (i + 1) * sides + (j + 1) % sides
-            d = (i + 1) * sides + j
-            faces.append((a, b, c, d))
-    faces.append(tuple(range(sides - 1, -1, -1)))
-    faces.append(tuple((len(stations) - 1) * sides + j for j in range(sides)))
-    mesh = bpy.data.meshes.new(name + " mesh")
-    mesh.from_pydata(verts, [], faces)
-    mesh.materials.append(mat)
-    obj = bpy.data.objects.new(name, mesh)
-    bpy.context.collection.objects.link(obj)
-    return smooth(obj)
+const white = new THREE.MeshStandardMaterial({ color: 0xe9e7da, roughness: 0.55 });
+const red = new THREE.MeshStandardMaterial({ color: 0xb52820, roughness: 0.5 });
+const glass = new THREE.MeshStandardMaterial({
+  color: 0x183b4c, metalness: 0.25, roughness: 0.2
+});
+const metal = new THREE.MeshStandardMaterial({ color: 0x858b8c, metalness: 0.7 });
+const tire = new THREE.MeshStandardMaterial({ color: 0x202124, roughness: 0.85 });
+const propMat = new THREE.MeshStandardMaterial({ color: 0x25282a, metalness: 0.5 });
 
-def make_wing(name, half_span, chord_root, chord_tip, x_center, z, mat):
-    # Swept, tapered wing made as a closed solid; Y is wingspan.
-    ys = [-half_span, -half_span * 0.72, 0, half_span * 0.72, half_span]
-    verts, faces = [], []
-    for y in ys:
-        t = abs(y) / half_span
-        chord = chord_root * (1 - t) + chord_tip * t
-        sweep = 0.10 * t
-        xc = x_center - sweep
-        thickness = 0.11 * (1 - 0.55 * t)
-        # Top and bottom leading/trailing edge points
-        verts.extend([
-            (xc - chord/2, y, z),
-            (xc + chord/2, y, z),
-            (xc - chord/2, y, z + thickness),
-            (xc + chord/2, y, z + thickness),
-        ])
-    # Join each spanwise section into a closed wing
-    for i in range(len(ys) - 1):
-        a, b = i * 4, (i + 1) * 4
-        for p, q in [(0, 1), (2, 3), (0, 2), (1, 3)]:
-            faces.append((a+p, a+q, b+q, b+p))
-    faces.extend([(0, 2, 3, 1),
-                  tuple((len(ys)-1)*4 + i for i in (0, 1, 3, 2))])
-    mesh = bpy.data.meshes.new(name + " mesh")
-    mesh.from_pydata(verts, [], faces)
-    mesh.materials.append(mat)
-    obj = bpy.data.objects.new(name, mesh)
-    bpy.context.collection.objects.link(obj)
-    bevel = obj.modifiers.new("Soft wing edges", "BEVEL")
-    bevel.width = 0.035
-    bevel.segments = 2
-    return obj
+function ellipsoid(name, pos, scale, mat, segments=32) {
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, segments, 20), mat);
+  mesh.name = name;
+  mesh.position.set(...pos);
+  mesh.scale.set(...scale);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+  return mesh;
+}
 
-# Fuselage: nose at +X, tail at -X
-make_loft("Fuselage", [
-    (2.15, 0.18, 1.45, 0.18),
-    (1.75, 0.30, 1.45, 0.28),
-    (1.10, 0.38, 1.43, 0.36),
-    (0.25, 0.40, 1.40, 0.38),
-    (-0.65, 0.34, 1.38, 0.33),
-    (-1.50, 0.24, 1.36, 0.25),
-    (-2.50, 0.13, 1.35, 0.15),
-    (-3.20, 0.07, 1.35, 0.08),
-], white)
+function rod(name, a, b, radius, mat) {
+  const start = new THREE.Vector3(...a), end = new THREE.Vector3(...b);
+  const dir = new THREE.Vector3().subVectors(end, start);
+  const mesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius, dir.length(), 12), mat
+  );
+  mesh.name = name;
+  mesh.position.copy(start).add(end).multiplyScalar(0.5);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+  mesh.castShadow = true;
+  scene.add(mesh);
+  return mesh;
+}
 
-# Red fuselage side stripe, as narrow side panels
-for side in (-1, 1):
-    uv_sphere("Red fuselage side stripe", (-0.05, side * 0.372, 1.46),
-              (1.42, 0.025, 0.045), red)
+// Fuselage runs nose (+X) to tail (-X).
+ellipsoid("Fuselage", [0, 1.35, 0], [2.45, 0.38, 0.36], white);
+ellipsoid("Nose cowl", [1.85, 1.38, 0], [0.62, 0.34, 0.34], white);
+ellipsoid("Tail taper", [-2.25, 1.36, 0], [0.95, 0.19, 0.20], white);
 
-# Main high wing
-make_wing("Main high wing", 5.05, 1.62, 0.92, 0.10, 2.12, white)
+// Red side stripe, both sides.
+for (const s of [-1, 1]) {
+  ellipsoid("Fuselage stripe", [-0.15, 1.43, s*0.347], [1.55, 0.045, 0.025], red);
+}
 
-# Wingtip red caps
-for side in (-1, 1):
-    uv_sphere("Wingtip accent", (0.02, side * 4.96, 2.17),
-              (0.48, 0.18, 0.075), red)
+// Main wing: tapered planform with a slight dihedral.
+function makeWing() {
+  const span = 5.05, sections = 20, verts = [], indices = [];
+  for (let i=0; i<=sections; i++) {
+    const t = i/sections, z = -span + 2*span*t;
+    const f = Math.abs(z)/span;
+    const chord = 1.62*(1-f) + 0.92*f;
+    const sweep = 0.16*f;
+    const xLead = -0.70 - sweep;
+    const y = 2.05 + 0.12*f;
+    const thick = 0.105*(1-0.45*f);
+    // Leading/trailing top and bottom vertices.
+    verts.push(
+      xLead, y+thick, z, xLead+chord, y+thick, z,
+      xLead, y-thick, z, xLead+chord, y-thick, z
+    );
+  }
+  for (let i=0; i<sections; i++) {
+    const a=i*4, b=(i+1)*4;
+    for (const [u,v] of [[0,1],[2,3],[0,2],[1,3]]) {
+      indices.push(a+u,a+v,b+v, a+u,b+v,b+u);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+  g.setIndex(indices);
+  g.computeVertexNormals();
+  const wing = new THREE.Mesh(g, white);
+  wing.name = "Main high wing";
+  wing.material.side = THREE.DoubleSide;
+  wing.castShadow = true;
+  wing.receiveShadow = true;
+  scene.add(wing);
+}
+makeWing();
 
-# Horizontal stabilizer and elevator
-make_wing("Tailplane", 1.55, 0.92, 0.62, -2.55, 1.52, white)
-uv_sphere("Vertical fin", (-2.65, 0, 1.82), (0.58, 0.075, 0.52), white)
-uv_sphere("Rudder", (-2.87, 0, 1.88), (0.36, 0.082, 0.40), red)
+// Red wingtip caps.
+for (const s of [-1, 1])
+  ellipsoid("Wingtip", [-0.72, 2.13, s*4.91], [0.42, 0.075, 0.18], red);
 
-# Cockpit side windows, on both sides
-for side in (-1, 1):
-    uv_sphere("Front side window", (0.55, side * 0.354, 1.68),
-              (0.43, 0.035, 0.22), glass)
-    uv_sphere("Rear side window", (-0.35, side * 0.338, 1.67),
-              (0.42, 0.035, 0.21), glass)
+// Horizontal tailplane and elevator.
+ellipsoid("Horizontal stabilizer", [-2.55, 1.52, 0], [0.58, 0.075, 1.48], white);
+ellipsoid("Elevator", [-2.92, 1.52, 0], [0.24, 0.065, 1.43], red);
 
-# Windscreen at the forward cockpit edge
-uv_sphere("Windscreen", (1.03, 0, 1.73), (0.18, 0.29, 0.23), glass)
+// Vertical fin and rudder.
+ellipsoid("Vertical fin", [-2.55, 1.78, 0], [0.56, 0.48, 0.075], white);
+ellipsoid("Rudder", [-2.84, 1.82, 0], [0.30, 0.39, 0.085], red);
 
-# Main landing gear struts and wheels
-for side in (-1, 1):
-    cylinder_between("Main gear strut", (0.25, side*0.25, 1.20),
-                     (0.45, side*0.82, 0.36), 0.045, metal)
-    # Wheels: cylinder axis along Y
-    bpy.ops.mesh.primitive_cylinder_add(
-        vertices=32, radius=0.30, depth=0.17,
-        location=(0.45, side*0.88, 0.31),
-        rotation=(math.pi/2, 0, 0)
-    )
-    wheel = bpy.context.object
-    wheel.name = "Main wheel"
-    wheel.data.materials.append(rubber)
-    smooth(wheel)
-    uv_sphere("Wheel hub", (0.45, side*0.98, 0.31),
-              (0.11, 0.035, 0.11), metal)
+// Cockpit glazing on both sides.
+for (const s of [-1, 1]) {
+  ellipsoid("Front side window", [0.55, 1.68, s*0.345], [0.43, 0.20, 0.045], glass);
+  ellipsoid("Rear side window", [-0.38, 1.67, s*0.33], [0.40, 0.19, 0.045], glass);
+}
+// Windscreen
+ellipsoid("Windscreen", [1.00, 1.70, 0], [0.20, 0.24, 0.27], glass);
 
-# Nose wheel and fork
-cylinder_between("Nose gear strut", (1.30, 0, 1.20),
-                 (1.55, 0, 0.36), 0.045, metal)
-bpy.ops.mesh.primitive_cylinder_add(
-    vertices=28, radius=0.20, depth=0.14,
-    location=(1.57, 0, 0.24),
-    rotation=(math.pi/2, 0, 0)
-)
-nosewheel = bpy.context.object
-nosewheel.name = "Nose wheel"
-nosewheel.data.materials.append(rubber)
-smooth(nosewheel)
+// Main landing gear, wheels and hubs.
+for (const s of [-1, 1]) {
+  rod("Main gear leg", [0.20, 1.12, s*0.22], [0.43, 0.36, s*0.79], 0.045, metal);
+  const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.09, 12, 28), tire);
+  wheel.name = "Main tire";
+  wheel.position.set(0.43, 0.31, s*0.84);
+  wheel.rotation.y = Math.PI/2;
+  wheel.castShadow = true;
+  scene.add(wheel);
+  ellipsoid("Wheel hub", [0.43, 0.31, s*0.91], [0.10, 0.10, 0.035], metal);
+}
 
-# Two-blade propeller at the nose
-uv_sphere("Propeller hub", (2.30, 0, 1.45), (0.13, 0.13, 0.13), metal)
-for angle in (0, math.pi):
-    blade = uv_sphere("Propeller blade", (2.39, 0, 1.45),
-                      (0.07, 0.095, 0.72), prop_mat)
-    blade.rotation_euler[0] = angle
+// Nose gear and tire.
+rod("Nose gear leg", [1.35, 1.08, 0], [1.55, 0.32, 0], 0.045, metal);
+const nw = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.065, 12, 24), tire);
+nw.name = "Nose tire";
+nw.position.set(1.57, 0.23, 0);
+nw.rotation.y = Math.PI/2;
+nw.castShadow = true;
+scene.add(nw);
 
-# Small exterior details: door handles and exhausts
-for side in (-1, 1):
-    uv_sphere("Door handle", (-0.55, side*0.365, 1.31),
-              (0.07, 0.025, 0.025), metal)
-    cylinder_between("Exhaust pipe", (1.55, side*0.27, 1.18),
-                     (1.86, side*0.27, 1.18), 0.035, metal)
+// Two-blade propeller at the nose.
+ellipsoid("Propeller hub", [2.48, 1.38, 0], [0.13, 0.13, 0.13], metal);
+for (const angle of [0, Math.PI]) {
+  const blade = ellipsoid("Propeller blade", [2.55, 1.38, 0], [0.07, 0.66, 0.095], propMat);
+  blade.rotation.x = angle;
+}
 
-# Ground plane for presentation
-ground_mat = material("Ground", (0.16, 0.18, 0.19))
-bpy.ops.mesh.primitive_plane_add(size=200, location=(0, 0, -0.08))
-ground = bpy.context.object
-ground.name = "Ground"
-ground.data.materials.append(ground_mat)
+// Simple door handles and exhausts.
+for (const s of [-1, 1]) {
+  ellipsoid("Door handle", [-0.55, 1.28, s*0.36], [0.07, 0.025, 0.025], metal);
+  rod("Exhaust", [1.42, 1.14, s*0.25], [1.80, 1.14, s*0.25], 0.035, metal);
+}
 
-# Camera and lighting
-bpy.ops.object.camera_add(location=(8, -11, 7))
-camera = bpy.context.object
-camera.name = "Camera"
-target = Vector((0, 0, 1.0))
-camera.rotation_euler = (target - camera.location).to_track_quat("-Z", "Y").to_euler()
-camera.data.lens = 52
-bpy.context.scene.camera = camera
+// Ground
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(200, 200),
+  new THREE.MeshStandardMaterial({ color: 0x68766d, roughness: 1 })
+);
+ground.rotation.x = -Math.PI/2;
+ground.position.y = -0.02;
+ground.receiveShadow = true;
+scene.add(ground);
 
-bpy.ops.object.light_add(type="AREA", location=(2, -5, 9))
-key = bpy.context.object
-key.name = "Large softbox"
-key.data.energy = 1500
-key.data.shape = "DISK"
-key.data.size = 7
-key.rotation_euler = (Vector((0, 0, 1)) - key.location).to_track_quat("-Z", "Y").to_euler()
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
 
-# Render settings
-scene = bpy.context.scene
-scene.render.engine = "BLENDER_EEVEE_NEXT"
-scene.render.resolution_x = 1200
-scene.render.resolution_y = 800
-scene.render.resolution_percentage = 100
-scene.world.color = (0.12, 0.12, 0.12)
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
